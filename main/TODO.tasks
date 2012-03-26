@@ -1,0 +1,5 @@
+beta:
+  - error messages in browser
+  - caching
+  - permanent db ( leveldb? )
+  - resizing!

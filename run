@@ -1,4 +1,3 @@
-#!/bin/sh
-cd browser
-go install 
-exec $GOPATH/bin/browser
+#!/bin/sh -e
+go build
+exec ./browser

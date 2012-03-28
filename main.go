@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"browser/phantom"	
+	_ "browser/mogrify"
 )
 
 func param(r *http.Request, name string) string {
@@ -11,6 +12,10 @@ func param(r *http.Request, name string) string {
 		return r.Form["src"][0]
 	}
 	return ""
+}
+
+func ServeFile(w http.ResponseWriter, r *http.Request, filename string) {
+	http.ServeFile(w, r, filename)
 }
 
 func main() {
@@ -28,7 +33,16 @@ func main() {
 				log.Printf("Error creating screenshot: %s", err)
 				http.Error(w, "Could not create screenshot", http.StatusInternalServerError)
 			} else {
-				http.ServeFile(w, r, filename)
+
+				size := param(r, "size")
+
+				if size == "" {
+					ServeFile(w, r, filename)	
+				} else {
+					
+				}
+
+				
 				return
 			}
 		}

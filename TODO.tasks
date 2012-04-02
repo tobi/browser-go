@@ -1,5 +1,8 @@
 beta:
-  - error messages in browser
-  - caching
-  - permanent db ( leveldb? )
-  - resizing!
+  ✓ error messages in browser
+  ✓ allow browser to use cache
+  ✓ create cache in front of browser
+  ✓ permanent db ( leveldb? )
+  ✓ resizing!
+  - avoid mobbing the screenshotter
+  - allow screenshotter to use it's own cache

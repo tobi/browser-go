@@ -43,7 +43,10 @@ func Resize(out io.Writer, in io.Reader, size string) error {
 }
 
 func ResizeFile(filename string, size string) error {
-	cmd := exec.Command("gm", "convert", "-resize", size, "-colorspace", "RGB", filename)
+	log.Printf("resize:%s", size)
+	cmd := exec.Command("gm", "convert", "-resize", size, "-colorspace", "RGB", filename, filename)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
   return cmd.Run()
 }
 

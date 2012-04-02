@@ -29,7 +29,6 @@ func servePng(w http.ResponseWriter, file io.Reader) {
 
 	// 3 hours
 	w.Header().Set("Cache-Control", "public, max-age=10800")
-
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, file)
 }
@@ -83,9 +82,9 @@ func Server(w http.ResponseWriter, r *http.Request) {
 	if len(buffer) == 0 {
 
 		// make the screenshot
-		filename, err := phantom.Screenshot(url)
+		filename := phantom.Screenshot(url)
 
-		if err != nil {
+		if filename == "" {
 			httpError(w, "Error creating screenshot")
 			return
 		}

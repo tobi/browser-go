@@ -6,5 +6,5 @@ import (
 
 func TestScreenshot(t *testing.T) {
 
-	phantomScreenshot("http://www.snowdevil.ca")
+	Screenshot("http://www.snowdevil.ca")
 }

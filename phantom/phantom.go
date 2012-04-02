@@ -13,6 +13,13 @@ var phantomPath string
 var rand uint32
 var dir string
 
+type shot struct {
+	url string 
+	resultChan chan string
+}
+
+var screenshotChan = make(chan *shot, 10)
+
 func init() {
 	dir = os.TempDir()
 	rand = reseed()
@@ -24,6 +31,32 @@ func init() {
 	if err != nil {
 		log.Fatalf("Cannot find phantomjs executable in bath")
 	}
+
+	go webkitWorker()
+	go webkitWorker()
+	go webkitWorker()
+	go webkitWorker()
+}
+
+func webkitWorker() {
+	for shot := range screenshotChan {
+
+		result, err := screenshot(shot.url)				
+		if err == nil {
+			shot.resultChan <- result
+		} else {
+			log.Printf("Screenshot error: %s", err)
+			close(shot.resultChan)
+		}
+
+	}
+}
+
+func Screenshot(url string) string {
+	shot := shot{url, make(chan string)}
+	
+	screenshotChan <- &shot
+	return <-shot.resultChan
 }
 
 func reseed() uint32 {
@@ -41,12 +74,12 @@ func tempPngFileName() string {
 	return filepath.Join(dir, "img", nextSuffix(), ".png")
 }
 
-func Screenshot(url string) (string, error) {
+func screenshot(url string) (string, error) {
 	log.Printf("Screenshotting %s", url)
 
 	filename := tempPngFileName()
 
-	cmd := exec.Command(phantomPath, "render.js", url, "1024", "786", filename)
+	cmd := exec.Command(phantomPath, "render.js", url, "1280", "500", filename)
 
 	// connect to STDIN / STDOUT
 	cmd.Stdout = os.Stdout

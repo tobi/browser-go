@@ -1,4 +1,4 @@
-package phantom
+package main
 
 import (
 	"log"
@@ -18,8 +18,6 @@ type shot struct {
 	resultChan chan string
 }
 
-var screenshotChan = make(chan *shot, 10)
-
 func init() {
 	dir = os.TempDir()
 	rand = reseed()
@@ -32,14 +30,24 @@ func init() {
 		log.Fatalf("Cannot find phantomjs executable in bath")
 	}
 
-	go webkitWorker()
-	go webkitWorker()
-	go webkitWorker()
-	go webkitWorker()
 }
 
-func webkitWorker() {
-	for shot := range screenshotChan {
+type Phantom struct {
+	screenshotChan chan *shot
+}
+
+func NewWebkitPool(pool int) *Phantom {
+	phantom := &Phantom{ make(chan *shot, 10) }
+
+	for i := 0; i < pool; i++ {
+		go phantom.webkitWorker()	
+	}
+	
+	return phantom
+}
+
+func (p *Phantom) webkitWorker() {
+	for shot := range p.screenshotChan {
 
 		result, err := screenshot(shot.url)				
 		if err == nil {
@@ -52,10 +60,9 @@ func webkitWorker() {
 	}
 }
 
-func Screenshot(url string) string {
-	shot := shot{url, make(chan string)}
-	
-	screenshotChan <- &shot
+func (p *Phantom) Screenshot(url string) string {
+	shot := shot{url, make(chan string)}	
+	p.screenshotChan <- &shot
 	return <-shot.resultChan
 }
 

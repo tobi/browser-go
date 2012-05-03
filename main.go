@@ -1,8 +1,7 @@
 package main
 
 import (
-	"browser/mogrify"
-	"browser/phantom"
+	"github.com/tobi/mogrify-go"
 	"bytes"
 	"flag"
 	"time"
@@ -11,6 +10,8 @@ import (
 	"log"
 	"net/http"
 )
+
+var phantom *Phantom = NewWebkitPool(1)
 
 func param(r *http.Request, name string) string {
 	if len(r.Form[name]) > 0 {
@@ -37,7 +38,7 @@ func fresh(c *cacheEntry) bool {
 	elapsed := time.Since(c.stat.ModTime()).Minutes()
 	log.Printf("Since last mod: %v", elapsed)
 
-	return time.Since(c.stat.ModTime()).Minutes() <  0.5
+	return time.Since(c.stat.ModTime()).Minutes() < 10
 }
 
 func httpError(w http.ResponseWriter, msg string) {
@@ -101,15 +102,35 @@ func Server(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var output = new(bytes.Buffer)
+	image := mogrify.NewImage()
+	defer image.Destroy()
 
-	if err := mogrify.Resize(output, bytes.NewBuffer(buffer), size); err != nil {
-		httpError(w, "could not resize")
+	log.Printf("buffer: %d", len(buffer))
+
+	err := image.OpenBlob(buffer)
+
+	if err != nil {
+		httpError(w, err.Error())
 		return
 	}
 
-	CacheStore(url + size, output.Bytes())
-	servePng(w, output)
+	resized, err := image.NewTransformation("", size)
+	defer resized.Destroy()
+
+	if err != nil {
+		httpError(w, err.Error())
+		return
+	}
+
+	blob, err := resized.Blob()
+
+	if err != nil {
+		httpError(w, err.Error())
+		return
+	}
+
+	CacheStore(url + size, blob)
+	servePng(w, bytes.NewBuffer(blob))
 	return
 }
 

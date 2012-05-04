@@ -14,7 +14,7 @@ var rand uint32
 var dir string
 
 type shot struct {
-	url string 
+	url        string
 	resultChan chan string
 }
 
@@ -37,19 +37,19 @@ type Phantom struct {
 }
 
 func NewWebkitPool(pool int) *Phantom {
-	phantom := &Phantom{ make(chan *shot, 10) }
+	phantom := &Phantom{make(chan *shot, 10)}
 
 	for i := 0; i < pool; i++ {
-		go phantom.webkitWorker()	
+		go phantom.webkitWorker()
 	}
-	
+
 	return phantom
 }
 
 func (p *Phantom) webkitWorker() {
 	for shot := range p.screenshotChan {
 
-		result, err := screenshot(shot.url)				
+		result, err := screenshot(shot.url)
 		if err == nil {
 			shot.resultChan <- result
 		} else {
@@ -61,7 +61,7 @@ func (p *Phantom) webkitWorker() {
 }
 
 func (p *Phantom) Screenshot(url string) string {
-	shot := shot{url, make(chan string)}	
+	shot := shot{url, make(chan string)}
 	p.screenshotChan <- &shot
 	return <-shot.resultChan
 }

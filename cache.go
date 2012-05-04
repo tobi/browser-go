@@ -18,7 +18,6 @@ type cacheEntry struct {
 	file     *os.File
 }
 
-
 func (c *cacheEntry) OpenFile() (*os.File, error) {
 	if c.file == nil {
 		file, err := os.Open(c.filepath)
@@ -30,8 +29,6 @@ func (c *cacheEntry) OpenFile() (*os.File, error) {
 
 	return c.file, nil
 }
-
-
 
 func init() {
 	os.MkdirAll(*cachePath, os.ModeDir|os.ModePerm)

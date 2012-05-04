@@ -1,14 +1,14 @@
 package main
 
 import (
-	"github.com/tobi/mogrify-go"
 	"bytes"
 	"flag"
-	"time"
+	"github.com/tobi/mogrify-go"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 )
 
 var phantom *Phantom = NewWebkitPool(1)
@@ -38,7 +38,7 @@ func fresh(c *cacheEntry) bool {
 	elapsed := time.Since(c.stat.ModTime()).Minutes()
 	log.Printf("Since last mod: %v", elapsed)
 
-	return time.Since(c.stat.ModTime()).Minutes() < 10
+	return time.Since(c.stat.ModTime()).Minutes() < 60*3
 }
 
 func httpError(w http.ResponseWriter, msg string) {
@@ -56,7 +56,7 @@ func Server(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var buffer  []byte
+	var buffer []byte
 	var cache *cacheEntry
 
 	// Let's just see if we may have a cache hit
@@ -64,8 +64,8 @@ func Server(w http.ResponseWriter, r *http.Request) {
 	cache = CacheLookup(url + size)
 	if cache != nil && fresh(cache) {
 		png, err := ioutil.ReadFile(cache.filepath)
-	
-		if err == nil {			
+
+		if err == nil {
 			servePng(w, bytes.NewBuffer(png))
 			return
 		}
@@ -93,7 +93,7 @@ func Server(w http.ResponseWriter, r *http.Request) {
 		png, err := ioutil.ReadFile(filename)
 		if err == nil {
 			buffer = png
-			CacheStore(url, buffer)		
+			CacheStore(url, buffer)
 		}
 	}
 
@@ -129,7 +129,7 @@ func Server(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	CacheStore(url + size, blob)
+	CacheStore(url+size, blob)
 	servePng(w, bytes.NewBuffer(blob))
 	return
 }

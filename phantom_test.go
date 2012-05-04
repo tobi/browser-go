@@ -5,6 +5,6 @@ import (
 )
 
 func TestScreenshot(t *testing.T) {
-  pool = NewWebkitPool(1)
-  pool.Screenshot("http://www.snowdevil.ca")
+	pool = NewWebkitPool(1)
+	pool.Screenshot("http://www.snowdevil.ca")
 }

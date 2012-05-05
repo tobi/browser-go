@@ -1,17 +1,19 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"github.com/tobi/mogrify-go"
-	"io"
 	"io/ioutil"
 	"log"
+	"fmt"
 	"net/http"
 	"time"
 )
 
 var phantom *Phantom = NewWebkitPool(1)
+
+var port *int = flag.Int("port", 3000, "port")
+var cacheLength *int = flag.Int("secs", 3*60, "cache retention in seconds")
 
 func param(r *http.Request, name string) string {
 	if len(r.Form[name]) > 0 {
@@ -24,113 +26,150 @@ func serveFile(w http.ResponseWriter, r *http.Request, filename string) {
 	http.ServeFile(w, r, filename)
 }
 
-func servePng(w http.ResponseWriter, file io.Reader) {
+// servePng takes a byte slice and flushes it on the wire
+// treating it as an image/png mime type
+func (p *Process) ServePng(b []byte) {
 	// mime
-	w.Header().Set("Content-Type", "image/png")
+	p.writer.Header().Set("Content-Type", "image/png")
 
 	// 3 hours
-	w.Header().Set("Cache-Control", "public, max-age=10800")
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, file)
+	p.writer.Header().Set("Cache-Control", "public, max-age=10800")
+	p.writer.WriteHeader(http.StatusOK)
+	p.writer.Write(b)
+	p.bytesWritten = len(b)	
+	p.status = http.StatusOK
 }
 
+// Return true if the cache entry should be considered
+// fresh based on the command line parameters
 func fresh(c *cacheEntry) bool {
 	elapsed := time.Since(c.stat.ModTime()).Minutes()
-	log.Printf("Since last mod: %v", elapsed)
-
-	return time.Since(c.stat.ModTime()).Minutes() < 60*3
+	return elapsed < float64(*cacheLength) * 3
 }
 
-func httpError(w http.ResponseWriter, msg string) {
-	log.Print(msg)
-	http.Error(w, msg, http.StatusInternalServerError)
+func (p *Process) ServeError(msg string) {
+	log.Println(msg)
+	p.status = http.StatusInternalServerError
+	http.Error(p.writer, msg, http.StatusInternalServerError)
 }
 
-func Server(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
-	url := param(r, "src")
-	size := param(r, "size")
+type Process struct {	
+	writer http.ResponseWriter
+	request *http.Request
 
-	if url == "" {
-		http.NotFound(w, r)
-		return
-	}
+	screenshotUrl string
+	screenshotSize string 
 
+	cacheHit bool
+	cacheHitRaw bool
+	bytesWritten int
+
+	status int
+}
+
+func (p *Process) Log() {
+	log.Printf("GET %s %dbytes %t %t", p.request.URL.Path, p.status, p.bytesWritten, p.cacheHit, p.cacheHitRaw)
+}
+
+func (p *Process) Handle() {
+	defer p.Log()
 	var buffer []byte
 	var cache *cacheEntry
 
 	// Let's just see if we may have a cache hit
-	// for the exact url + size
-	cache = CacheLookup(url + size)
+	// for the exact p.screenshotUrl + p.screenshotSize
+	cache = CacheLookup(p.screenshotUrl + p.screenshotSize)
 	if cache != nil && fresh(cache) {
+
 		png, err := ioutil.ReadFile(cache.filepath)
 
+		// can't read the file? 
 		if err == nil {
-			servePng(w, bytes.NewBuffer(png))
+			p.cacheHit = true
+			p.ServePng(png)
 			return
 		}
 	}
 
 	// look in the cache for this screenshot
-	cache = CacheLookup(url)
+	cache = CacheLookup(p.screenshotUrl)
 	if cache != nil && fresh(cache) {
 		png, err := ioutil.ReadFile(cache.filepath)
 		if err == nil {
+			p.cacheHitRaw = true
 			buffer = png
 		}
 	}
 
-	if len(buffer) == 0 {
+	if p.cacheHitRaw == false {
 
 		// make the screenshot
-		filename := phantom.Screenshot(url)
+		filename := phantom.Screenshot(p.screenshotUrl)
 
 		if filename == "" {
-			httpError(w, "Error creating screenshot")
+			p.ServeError("Error creating screenshot")
 			return
 		}
 
 		png, err := ioutil.ReadFile(filename)
 		if err == nil {
 			buffer = png
-			CacheStore(url, buffer)
+			CacheStore(p.screenshotUrl, buffer)
 		}
 	}
 
-	if size == "" {
-		servePng(w, bytes.NewBuffer(buffer))
+	if p.screenshotSize == "" {
+		p.ServePng(buffer)
 		return
 	}
 
 	image := mogrify.NewImage()
 	defer image.Destroy()
 
-	log.Printf("buffer: %d", len(buffer))
-
 	err := image.OpenBlob(buffer)
 
 	if err != nil {
-		httpError(w, err.Error())
+		p.ServeError(err.Error())
 		return
 	}
 
-	resized, err := image.NewTransformation("", size)
+	resized, err := image.NewTransformation("", p.screenshotSize)
 	defer resized.Destroy()
 
 	if err != nil {
-		httpError(w, err.Error())
+		p.ServeError(err.Error())
 		return
 	}
 
 	blob, err := resized.Blob()
 
 	if err != nil {
-		httpError(w, err.Error())
+		p.ServeError(err.Error())
 		return
 	}
 
-	CacheStore(url+size, blob)
-	servePng(w, bytes.NewBuffer(blob))
+	CacheStore(p.screenshotUrl+p.screenshotSize, blob)
+	p.ServePng(blob)
+}
+
+
+func Server(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+
+	process := Process{writer: w, request: r}
+
+	if len(r.Form["src"]) > 0 {
+		process.screenshotUrl = r.Form["src"][0]
+	} else {
+		http.NotFound(w, r)
+		return 
+	}
+
+	if len(r.Form["size"]) > 0 {
+		process.screenshotSize = r.Form["size"][0]
+	}
+
+	process.Handle()	
 	return
 }
 
@@ -139,10 +178,10 @@ func main() {
 	http.HandleFunc("/favicon.ico", http.NotFound)
 	http.HandleFunc("/", Server)
 
-	port := ":3000"
-	log.Printf("Running and listening to port %s", port)
+	binding := fmt.Sprintf(":%d", *port)
+	log.Printf("Running and listening to port %d", *port)
 
-	if err := http.ListenAndServe(port, nil); err != nil {
+	if err := http.ListenAndServe(binding, nil); err != nil {
 		log.Panicln("Could not start server:", err)
 	}
 }

@@ -5,4 +5,6 @@ beta:
   ✓ permanent db ( leveldb? )
   ✓ resizing!
   - avoid mobbing the screenshotter
-  - allow screenshotter to use it's own cache
+  ✓ allow screenshotter to use it's own cache
+  - aspect ratio of the screenshotter doesnt work?
+  - allow spdy?

@@ -167,8 +167,6 @@ func Server(w http.ResponseWriter, r *http.Request) {
 
 	process := Process{writer: w, request: r}
 
-	panic(errors.New("OhMeGod"))
-
 	if len(r.Form["src"]) > 0 {
 		process.screenshotUrl = r.Form["src"][0]
 	} else {

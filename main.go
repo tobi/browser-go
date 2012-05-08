@@ -3,17 +3,23 @@ package main
 import (
 	"flag"
 	"github.com/tobi/mogrify-go"
+	"github.com/tobi/airbrake-go"
 	"io/ioutil"
 	"log"
 	"fmt"
 	"net/http"
 	"time"
+	"errors"
 )
 
-var phantom *Phantom = NewWebkitPool(1)
-
 var port *int = flag.Int("port", 3000, "port")
-var cacheLength *int = flag.Int("secs", 3*60, "cache retention in seconds")
+var cacheLength *int = flag.Int("secs", 3*60*60, "cache retention in seconds (3 hours)")
+var webkitInstances *int = flag.Int("webkits", 5, "amount of webkits in pool")
+
+var airbrakeEndpoint *string = flag.String("airbrake-endpoint", airbrake.Endpoint, "endpoint for airbrake [optional]")
+var airbrakeApiKey *string = flag.String("airbrake-api-key", "", "api key for airbrake [optional]")
+
+var phantom *Phantom = NewWebkitPool(*webkitInstances)
 
 func param(r *http.Request, name string) string {
 	if len(r.Form[name]) > 0 {
@@ -60,15 +66,15 @@ type Process struct {
 	screenshotUrl string
 	screenshotSize string 
 
-	cacheHit bool
-	cacheHitRaw bool
+	cached bool
+	cachedScreenshot bool
 	bytesWritten int
 
 	status int
 }
 
 func (p *Process) Log() {
-	log.Printf("GET %s %dbytes %t %t", p.request.URL.Path, p.status, p.bytesWritten, p.cacheHit, p.cacheHitRaw)
+	log.Printf("GET status:%d url:%s size:%s bytes:%d cached:%v cachedScreenshot:%v", p.status, p.screenshotUrl, p.screenshotSize, p.bytesWritten, p.cached, p.cachedScreenshot)
 }
 
 func (p *Process) Handle() {
@@ -85,7 +91,7 @@ func (p *Process) Handle() {
 
 		// can't read the file? 
 		if err == nil {
-			p.cacheHit = true
+			p.cached = true
 			p.ServePng(png)
 			return
 		}
@@ -96,12 +102,12 @@ func (p *Process) Handle() {
 	if cache != nil && fresh(cache) {
 		png, err := ioutil.ReadFile(cache.filepath)
 		if err == nil {
-			p.cacheHitRaw = true
+			p.cachedScreenshot = true
 			buffer = png
 		}
 	}
 
-	if p.cacheHitRaw == false {
+	if p.cachedScreenshot == false {
 
 		// make the screenshot
 		filename := phantom.Screenshot(p.screenshotUrl)
@@ -152,11 +158,16 @@ func (p *Process) Handle() {
 	p.ServePng(blob)
 }
 
-
 func Server(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
+	if airbrake.ApiKey {
+		defer airbrake.CapturePanic(r)
+	}
+
 	process := Process{writer: w, request: r}
+
+	panic(errors.New("OhMeGod"))
 
 	if len(r.Form["src"]) > 0 {
 		process.screenshotUrl = r.Form["src"][0]
@@ -175,6 +186,10 @@ func Server(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
+
+	airbrake.Endpoint = *airbrakeEndpoint
+	airbrake.ApiKey = *airbrakeApiKey
+
 	http.HandleFunc("/favicon.ico", http.NotFound)
 	http.HandleFunc("/", Server)
 

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	"errors"
 )
 
 var port *int = flag.Int("port", 3000, "port")
@@ -42,7 +41,7 @@ func (p *Process) ServePng(b []byte) {
 	p.writer.Header().Set("Cache-Control", "public, max-age=10800")
 	p.writer.WriteHeader(http.StatusOK)
 	p.writer.Write(b)
-	p.bytesWritten = len(b)	
+	p.bytesWritten = len(b)
 	p.status = http.StatusOK
 }
 
@@ -50,7 +49,7 @@ func (p *Process) ServePng(b []byte) {
 // fresh based on the command line parameters
 func fresh(c *cacheEntry) bool {
 	elapsed := time.Since(c.stat.ModTime()).Minutes()
-	return elapsed < float64(*cacheLength) * 3
+	return elapsed < float64(*cacheLength)*3
 }
 
 func (p *Process) ServeError(msg string) {
@@ -59,16 +58,16 @@ func (p *Process) ServeError(msg string) {
 	http.Error(p.writer, msg, http.StatusInternalServerError)
 }
 
-type Process struct {	
-	writer http.ResponseWriter
+type Process struct {
+	writer  http.ResponseWriter
 	request *http.Request
 
-	screenshotUrl string
-	screenshotSize string 
+	screenshotUrl  string
+	screenshotSize string
 
-	cached bool
+	cached           bool
 	cachedScreenshot bool
-	bytesWritten int
+	bytesWritten     int
 
 	status int
 }
@@ -171,14 +170,14 @@ func Server(w http.ResponseWriter, r *http.Request) {
 		process.screenshotUrl = r.Form["src"][0]
 	} else {
 		http.NotFound(w, r)
-		return 
+		return
 	}
 
 	if len(r.Form["size"]) > 0 {
 		process.screenshotSize = r.Form["size"][0]
 	}
 
-	process.Handle()	
+	process.Handle()
 	return
 }
 
